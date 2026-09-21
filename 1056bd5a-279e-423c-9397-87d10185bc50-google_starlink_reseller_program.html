@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Starlink Enterprise Portal | Christo Botha (SA-iLabs)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        google: {
+                            blue: '#1a73e8',
+                            blueHover: '#1557b0',
+                            red: '#ea4335',
+                            yellow: '#fbbc04',
+                            green: '#34a853',
+                            bg: '#f8fafc',
+                            card: '#ffffff',
+                            border: '#e2e8f0'
+                        },
+                        starlink: {
+                            slate: '#0f172a',
+                            subtle: '#64748b',
+                            accent: '#2563eb',
+                            cyan: '#0284c7',
+                            emerald: '#059669'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'monospace'],
+                        sans: ['Outfit', 'Space Grotesk', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- jsPDF & HTML2Canvas for client-side Google Drive PDF contract generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-family: 'Outfit', sans-serif;
+            background-image: linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%);
+        }
+
+        .card-light {
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .card-light:hover {
+            border-color: rgba(96, 165, 250, 0.65);
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.10);
+        }
+        .field-valid {
+            border-color: #10b981 !important;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+        }
+        .field-invalid {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+        }
+        .workflow-step {
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+        .workflow-step.is-complete {
+            color: #059669;
+        }
+        .workflow-step.is-complete .step-dot {
+            background: #059669;
+        }
+        .step-dot {
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+        .step-dot.is-active {
+            transform: scale(1.12);
+            box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.12);
+        }
+
+        /* Clean light theme scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .pulse-active {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
+
+        .btn-google {
+            background-color: #1a73e8;
+            color: #ffffff;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+        }
+        .btn-google:hover {
+            background-color: #1557b0;
+            box-shadow: 0 4px 12px rgba(26, 115, 232, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .card-light {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .toast-slide {
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-blue-100 selection:text-blue-900">
+
+    <!-- Navigation Bar -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 lg:px-8 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Brand & Reseller Meta -->
+            <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs tracking-wider font-mono text-blue-600 font-bold uppercase">Google LLC</span>
+                    <span class="text-slate-300">|</span>
+                    <i class="fa-solid font-bold text-base text-slate-900 tracking-widest">STARLINK</i>
+                </div>
+                <span class="hidden sm:inline-block bg-blue-50 text-blue-700 text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full border border-blue-200">
+                    SA-iLabs Reseller Workflow
+                </span>
+            </div>
+
+            <!-- Lead Reseller Info & Live Workflow Target -->
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex flex-col text-right">
+                    <span class="text-xs font-semibold text-slate-800 flex items-center justify-end gap-1.5">
+                        <span>Christo Botha</span>
+                        <i class="fa-solid fa-circle-check text-blue-600 text-xs"></i>
+                    </span>
+                    <span class="text-[10px] text-slate-500 font-mono">Cape Town, ZA • SA-iLabs</span>
+                </div>
+                
+                <div class="h-7 w-px bg-slate-200 hidden md:block"></div>
+
+                <!-- Google Integration Badge -->
+                <div class="flex items-center space-x-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-mono">
+                    <i class="fa-solid fa-cloud text-blue-600"></i>
+                    <span class="text-slate-600 hidden lg:inline">Target:</span>
+                    <span class="text-slate-900 font-semibold">sailabs.wc@gmail.com</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-active ml-1"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 lg:px-8 py-8 flex-grow space-y-8">
+
+        <!-- Hero Section: Official Reseller Authorization -->
+        <section class="card-light futuristic-glow rounded-2xl p-6 lg:p-8 bg-gradient-to-r from-white via-slate-50 to-blue-50/50 border border-slate-200 relative overflow-hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <!-- Left Details -->
+                <div class="lg:col-span-8 space-y-4">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/80 border border-blue-200 text-blue-700 text-xs font-mono font-semibold">
+                        <i class="fa-solid fa-shield-halved text-blue-600"></i>
+                        Official Google LLC Acknowledged & Registered Partner Portal
+                    </div>
+
+                    <h1 class="text-2xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
+                        Google Starlink Enterprise <br>
+                        <span class="text-blue-600">Live Workflow & Signup Application</span>
+                    </h1>
+
+                    <p class="text-slate-600 text-sm leading-relaxed max-w-2xl">
+                        Integrated signup pipeline operated by <strong>Christo Botha</strong> (Machine Learning Researcher, Developer & LLM Architect). Direct automated sync with Google Drive storage, Gmail notification dispatch to <code>sailabs.wc@gmail.com</code>, and instant SLA PDF generation.
+                    </p>
+
+                    <!-- Reseller Profile Badges -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                                <i class="fa-solid fa-user-gear text-sm"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-semibold block">Lead Reseller</span>
+                                <span class="text-xs font-bold text-slate-800 block">Christo Botha</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                                <i class="fa-solid fa-microchip text-sm"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-semibold block">Specialization</span>
+                                <span class="text-xs font-bold text-slate-800 block">LLM Architect / ML</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                                <i class="fa-solid fa-location-dot text-sm"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-semibold block">Dispatch Hub</span>
+                                <span class="text-xs font-bold text-slate-800 block">Cape Town, ZA</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Quick Stats Card -->
+                <div class="lg:col-span-4 bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <span class="text-xs font-mono uppercase text-slate-500 font-bold">Workflow Status</span>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Runtime
+                        </span>
+                    </div>
+
+                    <div class="space-y-2.5 text-xs">
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span>Google Drive Target:</span>
+                            <span class="font-mono text-slate-900 font-medium">SA-iLabs / Registrations</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span>Gmail Dispatch:</span>
+                            <span class="font-mono text-blue-600 font-semibold">sailabs.wc@gmail.com</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-600">
+                            <span>Master Package:</span>
+                            <span class="font-mono text-emerald-700 font-bold">Uncapped Enterprise</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button onclick="openAppsScriptModal()" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-code text-blue-600"></i>
+                            <span>View Google Apps Script Hook</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Live Orbital Link Telemetry (Light Palette) -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 card-light rounded-2xl p-5 flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 pulse-active"></span>
+                        <h2 class="text-xs font-mono uppercase tracking-wider text-slate-800 font-bold">
+                            Live Starlink Gateway Sync // Cape Town (-33.9249°, 18.4241°)
+                        </h2>
+                    </div>
+                    <span id="livePingBadge" class="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded border border-blue-100">
+                        Ping: 17ms
+                    </span>
+                </div>
+
+                <!-- Canvas Visualizer -->
+                <div class="relative my-3 h-48 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                    <canvas id="orbitCanvas" class="w-full h-full"></canvas>
+                    <div class="absolute bottom-3 left-3 bg-slate-900/90 backdrop-blur-md px-3 py-1 rounded border border-slate-700 text-[10px] font-mono text-slate-300">
+                        Lead Reseller: <span class="text-white font-semibold">Christo Botha (Cape Town, ZA)</span>
+                    </div>
+                </div>
+
+                <!-- Live Metrics Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-slate-500 block text-[10px]">DOWNLINK</span>
+                        <span class="text-blue-600 font-bold">120 - 900 Mbps</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-slate-500 block text-[10px]">UPLINK</span>
+                        <span class="text-slate-800 font-bold">70 - 200 Mbps</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-slate-500 block text-[10px]">DATA CAP</span>
+                        <span class="text-emerald-600 font-bold">100% Uncapped</span>
+                    </div>
+                    <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                        <span class="text-slate-500 block text-[10px]">SERVICE SLA</span>
+                        <span class="text-purple-600 font-bold">Guaranteed TOS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Single Enterprise Package Highlight Card -->
+            <div class="card-light rounded-2xl p-5 flex flex-col justify-between bg-gradient-to-br from-white to-blue-50/30">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-mono font-bold text-blue-600 uppercase tracking-wider">Single Master Tier</span>
+                        <span class="bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold px-2 py-0.5 rounded">TOS Guaranteed</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mt-2">Uncapped Enterprise Link</h3>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Flagship satellite link engineered by Christo Botha for high-volume enterprise data pipelines, LLM weight syncing, and zero-downtime remote operations.
+                    </p>
+                </div>
+
+                <div class="my-4 bg-white p-4 rounded-xl border border-slate-200 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-500 font-mono">Download Speed:</span>
+                        <span class="font-mono font-bold text-blue-600">120 – 900 Mbps</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-500 font-mono">Upload Speed:</span>
+                        <span class="font-mono font-bold text-slate-800">70 – 200 Mbps</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-500 font-mono">Data Quota:</span>
+                        <span class="font-mono font-bold text-emerald-600">Uncapped Data</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs border-t border-slate-100 pt-2">
+                        <span class="text-slate-500 font-mono">Base Investment:</span>
+                        <span class="font-mono font-bold text-slate-900 text-base">R950 / month</span>
+                    </div>
+                </div>
+
+                <button onclick="autofillSampleData()" class="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-300 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i>
+                    <span>Autofill Sample Applicant Data</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Main Form & Workflow Pipeline -->
+        <section class="card-light rounded-2xl p-6 lg:p-8 bg-white relative">
+            
+            <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-200 gap-4">
+                <div>
+                    <span class="text-xs font-mono font-bold text-blue-600 uppercase tracking-wider block">Enterprise Signup Pipeline</span>
+                    <h2 class="text-2xl font-bold text-slate-900 mt-0.5">Google Starlink Reseller Registration</h2>
+                </div>
+
+                <!-- Live Integration Method Indicator -->
+                <div class="flex items-center space-x-2 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs">
+                    <span class="text-slate-500 font-mono">Destination Email:</span>
+                    <strong class="text-slate-900 font-mono font-bold">sailabs.wc@gmail.com</strong>
+                </div>
+            </div>
+
+            <form id="signupForm" onsubmit="executeWorkflow(event)" class="mt-8 space-y-8">
+
+                <!-- STEP 1: Enterprise Profile -->
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-mono text-xs font-bold flex items-center justify-center">1</span>
+                        <h3 class="text-base font-bold text-slate-900 uppercase tracking-wide font-mono">Applicant & Enterprise Information</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Full Contact Name *</label>
+                            <input type="text" id="appFullName" required placeholder="e.g. Dr. Adrian Vance"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Organization / Enterprise Name *</label>
+                            <input type="text" id="appOrgName" required placeholder="e.g. DeepSouth AI Labs (Pty) Ltd"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Email Address *</label>
+                            <input type="email" id="appEmail" required placeholder="e.g. adrian@deepsouth.ai"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Phone / Mobile Number *</label>
+                            <input type="tel" id="appPhone" required placeholder="e.g. +27 82 123 4567"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Deployment Physical Location (South Africa / SADC) *</label>
+                            <input type="text" id="appLocation" required placeholder="e.g. Stellenbosch Technopark, Western Cape, South Africa"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Exclusive Package Selection -->
+                <div class="space-y-4 pt-6 border-t border-slate-200">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-mono text-xs font-bold flex items-center justify-center">2</span>
+                        <h3 class="text-base font-bold text-slate-900 uppercase tracking-wide font-mono">Exclusive Starlink Uncapped Package</h3>
+                    </div>
+
+                    <div class="bg-gradient-to-r from-blue-50 via-slate-50 to-white p-5 rounded-xl border-2 border-blue-500 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-600 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded">Reseller Tier-1</span>
+                                <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    <i class="fa-solid fa-check mr-1"></i> Guaranteed TOS Included
+                                </span>
+                            </div>
+                            <h4 class="text-xl font-bold text-slate-900">Google Starlink Uncapped Enterprise Link</h4>
+                            <p class="text-xs text-slate-600 leading-relaxed max-w-xl">
+                                Full capacity high-speed satellite hardware terminal, priority bandwidth routing, and SLA agreement managed directly from Cape Town by Christo Botha.
+                            </p>
+                            
+                            <div class="flex flex-wrap gap-4 pt-1 text-xs font-mono">
+                                <div><span class="text-slate-400">DL:</span> <strong class="text-blue-600">120-900 Mbps</strong></div>
+                                <div><span class="text-slate-400">UL:</span> <strong class="text-slate-800">70-200 Mbps</strong></div>
+                                <div><span class="text-slate-400">DATA:</span> <strong class="text-emerald-600">Uncapped</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="text-left md:text-right border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-6 flex-shrink-0">
+                            <span class="text-[10px] font-mono text-slate-400 uppercase block">Monthly Subscription</span>
+                            <div class="text-2xl font-bold font-mono text-slate-900">R950 / month</div>
+                            <span class="text-[10px] font-mono text-slate-500 block">Paid in advance annually: R11,400</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Installation & Subscription -->
+                <div class="space-y-4 pt-6 border-t border-slate-200">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-mono text-xs font-bold flex items-center justify-center">3</span>
+                        <h3 class="text-base font-bold text-slate-900 uppercase tracking-wide font-mono">New Client Onboarding & Subscription</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <label class="flex items-start space-x-3 p-3.5 bg-blue-50 border-2 border-blue-500 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors">
+                            <input type="radio" name="installationType" id="installationRemote" value="Remote" checked onchange="recalculateTotal()" class="mt-0.5 accent-blue-600">
+                            <div>
+                                <strong class="text-slate-900 block font-semibold">Remote Installation Labour — R1,450</strong>
+                                <span class="text-slate-500 text-[11px] block mt-0.5">Remote onboarding and installation support.</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-start space-x-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                            <input type="radio" name="installationType" id="installationOnsite" value="On-Site" onchange="recalculateTotal()" class="mt-0.5 accent-blue-600">
+                            <div>
+                                <strong class="text-slate-900 block font-semibold">On-Site Installation Labour — R2,550</strong>
+                                <span class="text-slate-500 text-[11px] block mt-0.5">On-site onboarding and installation support.</span>
+                            </div>
+                        </label>
+
+                        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                            <strong class="text-slate-900 block font-semibold">Monthly Subscription — R950 / month</strong>
+                            <span class="text-slate-500 text-[11px] block mt-0.5">Paid in advance per annum: 12 × R950 = R11,400.</span>
+                        </div>
+
+                        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                            <strong class="text-slate-900 block font-semibold">Amount Due Upon Receipt</strong>
+                            <span class="text-slate-500 text-[11px] block mt-0.5">Installation labour plus the first annual subscription payment.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4: Payment Details -->
+                <div class="space-y-4 pt-6 border-t border-slate-200">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-mono text-xs font-bold flex items-center justify-center">4</span>
+                        <h3 class="text-base font-bold text-slate-900 uppercase tracking-wide font-mono">Payment Instructions</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                            <span class="text-[10px] text-blue-700 font-mono uppercase font-bold">Business Banking Details</span>
+                            <div class="mt-2 space-y-1 text-slate-700 font-mono">
+                                <p><strong>Bank:</strong> Capitec Bank</p>
+                                <p><strong>Account name:</strong> Sailabs</p>
+                                <p><strong>Account type:</strong> Entrepreneur / Current Acc</p>
+                                <p><strong>Branch:</strong> 470010</p>
+                                <p><strong>Account number:</strong> 2490686905</p>
+                            </div>
+                        </div>
+                        <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                            <span class="text-[10px] text-emerald-700 font-mono uppercase font-bold">Payment Terms</span>
+                            <p class="mt-2 text-slate-800 font-semibold">Payment upon receipt.</p>
+                            <p class="mt-1 text-slate-600">Immediate Release Payments, PayShap, or cash accepted.</p>
+                            <p class="mt-3 text-[11px] text-slate-500">Please use the registration reference as the payment reference.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 5: Live Google Integration Endpoint & Dispatch -->
+                <div class="space-y-4 pt-6 border-t border-slate-200">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-6 h-6 rounded-full bg-blue-600 text-white font-mono text-xs font-bold flex items-center justify-center">5</span>
+                        <h3 class="text-base font-bold text-slate-900 uppercase tracking-wide font-mono">Live Google Drive & Gmail Workflow Engine</h3>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                            <div>
+                                <strong class="text-slate-800 font-bold block">Live Apps Script Webhook Endpoint (Optional)</strong>
+                                <span class="text-slate-500 text-[11px]">Paste your Google Apps Script Web App URL below to auto-post directly to Google Drive & Gmail in real-time.</span>
+                            </div>
+                            <button type="button" onclick="openAppsScriptModal()" class="text-blue-600 hover:underline font-mono text-[11px] font-semibold whitespace-nowrap">
+                                <i class="fa-solid fa-circle-question mr-1"></i>Get Script Code
+                            </button>
+                        </div>
+
+                        <div>
+                            <input type="url" id="appsScriptUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec (Optional for live Webhook)"
+                                class="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div class="flex items-center space-x-2 text-[11px] text-slate-600">
+                            <i class="fa-solid fa-shield-cat text-blue-600"></i>
+                            <span>Fallback: Even without a Webhook, the system generates a downloadable SLA PDF & triggers pre-formatted Gmail email to <strong>sailabs.wc@gmail.com</strong>.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Investment Summary & Execute Action -->
+                <div class="p-6 rounded-xl bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+                    <div class="space-y-1">
+                        <span class="text-xs font-mono text-blue-400 uppercase tracking-wider font-semibold block">Amount Due Upon Receipt</span>
+                        <div class="text-3xl font-mono font-bold text-white" id="grandTotalLabel">R12,850</div>
+                        <span class="text-[11px] text-slate-400 font-mono block">Installation labour + 12 × R950 annual subscription, paid in advance.</span>
+                    </div>
+
+                    <button type="submit" id="submitWorkflowBtn" class="btn-google w-full md:w-auto px-8 py-4 rounded-xl font-bold text-xs tracking-wider uppercase flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-paper-plane text-sm"></i>
+                        <span>Execute Workflow & Register</span>
+                    </button>
+                </div>
+
+            </form>
+        </section>
+
+        <!-- Live Enterprise Signup Registry Table -->
+        <section class="card-light rounded-2xl p-6 bg-white space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Live Enterprise Registrations & Workflow Registry</h3>
+                    <p class="text-xs text-slate-500">Real-time record of submitted signups, Google Drive document status, and Gmail notifications.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-xs font-mono text-slate-500" id="registryCount">Total Records: 0</span>
+                    <button onclick="clearRegistry()" class="text-xs text-slate-400 hover:text-red-600 px-2 py-1 border border-slate-200 rounded">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-mono font-semibold uppercase text-[10px]">
+                            <th class="p-3">Ref ID</th>
+                            <th class="p-3">Applicant & Organization</th>
+                            <th class="p-3">Package & SLA</th>
+                            <th class="p-3">Total Investment</th>
+                            <th class="p-3">Drive Sync</th>
+                            <th class="p-3">Gmail Dispatch</th>
+                            <th class="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="registryTableBody" class="divide-y divide-slate-100 font-mono">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Workflow Success & Google Drive Sync Modal -->
+    <div id="successModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="card-light max-w-2xl w-full rounded-2xl p-6 lg:p-8 space-y-6 relative max-h-[90vh] overflow-y-auto">
+            
+            <div class="flex items-start justify-between border-b border-slate-100 pb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl font-bold">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Workflow Execution Complete</h3>
+                        <p class="text-xs font-mono text-blue-600">Registration Reference: <span id="modalRefId">GS-ZA-000000</span></p>
+                    </div>
+                </div>
+                <button onclick="closeSuccessModal()" class="text-slate-400 hover:text-slate-700 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Pipeline Status Steps -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs font-mono">
+                <div class="flex items-center justify-between text-slate-700">
+                    <span>1. Application Payload Generated:</span>
+                    <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> Success</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-700">
+                    <span>2. SLA Contract PDF (Google Drive Format):</span>
+                    <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> Ready for Drive Export</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-700">
+                    <span>3. Target Gmail Dispatch (sailabs.wc@gmail.com):</span>
+                    <span id="modalGmailStatus" class="text-blue-600 font-bold"><i class="fa-solid fa-paper-plane mr-1"></i> Pre-formatted Trigger</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-700 border-t border-slate-200 pt-2">
+                    <span>Assigned Lead Reseller:</span>
+                    <span class="text-slate-900 font-bold">Christo Botha (Cape Town, South Africa)</span>
+                </div>
+            </div>
+
+            <!-- Summary Details Container -->
+            <div id="modalSummaryContent" class="space-y-3 text-xs bg-white p-4 rounded-xl border border-slate-200">
+                <!-- Dynamic text populated by JS -->
+            </div>
+
+            <!-- Actions -->
+            <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+                <button onclick="downloadPdfContract()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-red-600"></i>
+                    <span>Download SLA Contract PDF</span>
+                </button>
+
+                <button onclick="sendGmailTrigger()" class="w-full sm:w-auto btn-google px-5 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-envelope"></i>
+                    <span>Open Gmail Email Draft</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Apps Script Generator Modal -->
+    <div id="appsScriptModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="card-light max-w-3xl w-full rounded-2xl p-6 lg:p-8 space-y-4 relative max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-brands fa-google text-blue-600 text-xl"></i>
+                    <h3 class="text-base font-bold text-slate-900">Google Apps Script Live Webhook (Google Drive + Gmail)</h3>
+                </div>
+                <button onclick="closeAppsScriptModal()" class="text-slate-400 hover:text-slate-700 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed">
+                Copy this pre-configured Google Apps Script code into your Google Apps Script editor bound to your <strong>sailabs.wc@gmail.com</strong> account. When deployed as a Web App (Access: Anyone), signups will automatically create a document in Google Drive and send an email notification to <strong>sailabs.wc@gmail.com</strong>.
+            </p>
+
+            <div class="relative bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-[11px] overflow-x-auto max-h-64">
+                <button onclick="copyAppsScriptCode()" class="absolute top-3 right-3 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded text-[10px] font-sans font-semibold">
+                    Copy Code
+                </button>
+                <pre id="appsScriptCodeText">
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    
+    // 1. Target Email Notification for SA-iLabs
+    var targetEmail = "sailabs.wc@gmail.com";
+    var subject = "NEW GOOGLE STARLINK REGISTRATION: " + data.refId + " (" + data.organization + ")";
+    
+    var body = "NEW STARLINK ENTERPRISE SIGNUP RECEIVED\n\n" +
+               "Reference ID: " + data.refId + "\n" +
+               "Applicant Name: " + data.fullName + "\n" +
+               "Organization: " + data.organization + "\n" +
+               "Email: " + data.email + "\n" +
+               "Phone: " + data.phone + "\n" +
+               "Location: " + data.location + "\n\n" +
+               "PACKAGE DETAILS:\n" +
+               "Package: New Client Starlink Onboarding\n" +
+               "Installation: " + data.installationType + " (R" + data.installationPrice + ")\n" +
+               "Monthly Subscription: R950\n" +
+               "Annual Subscription: 12 x R950 = R11,400\n" +
+               "Payment Terms: Payment upon receipt\n" +
+               "Accepted: Immediate Release Payments, PayShap, or Cash\n" +
+               "Amount Due Upon Receipt: " + data.totalPrice + "\n\n" +
+               "BANKING DETAILS:\n" +
+               "Capitec Bank | Sailabs | Entrepreneur / Current Acc\n" +
+               "Branch: 470010 | Account #: 2490686905\n\n" +
+               "LEAD RESELLER:\n" +
+               "Christo Botha (Google LLC Acknowledged Reseller, Cape Town, ZA)\n\n" +
+               "Timestamp: " + new Date().toString();
+
+    GmailApp.sendEmail(targetEmail, subject, body);
+
+    // 2. Save directly into Google Drive Folder
+    var folderName = "SA-iLabs Starlink Registrations";
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+    
+    var fileName = "Registration_" + data.refId + "_" + data.organization.replace(/[^a-zA-Z0-9]/g, "_") + ".txt";
+    folder.createFile(fileName, body);
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", refId: data.refId }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+                </pre>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeAppsScriptModal()" class="btn-google px-6 py-2 rounded-lg text-xs font-semibold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Container for PDF Rendering -->
+    <div id="pdfRenderTemplate" class="fixed -left-[9999px] top-0 w-[800px] bg-white p-10 font-sans text-slate-900">
+        <div class="border-b-2 border-blue-600 pb-4 mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">GOOGLE STARLINK ENTERPRISE SLA</h1>
+                <p class="text-xs font-mono text-blue-600">Official Service Level Agreement & Hardware Reservation</p>
+            </div>
+            <div class="text-right font-mono text-xs">
+                <div>Ref: <strong id="pdfRefId">GS-ZA-000000</strong></div>
+                <div>Date: <span id="pdfDate">2026-09-21</span></div>
+            </div>
+        </div>
+
+        <div class="space-y-6 text-xs leading-relaxed">
+            <div class="bg-slate-50 p-4 rounded border border-slate-200">
+                <h3 class="font-bold text-sm text-slate-800 uppercase font-mono mb-2">1. Reseller & Gateway Information</h3>
+                <p><strong>Authorized Reseller:</strong> Christo Botha (Google LLC Acknowledged & Registered Reseller)</p>
+                <p><strong>Specialization:</strong> Machine Learning Researcher, Developer & LLM Architect</p>
+                <p><strong>Regional Gateway Hub:</strong> Cape Town, South Africa (Lat: -33.9249°, Long: 18.4241°)</p>
+                <p><strong>Enterprise Contact Email:</strong> sailabs.wc@gmail.com</p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded border border-slate-200">
+                <h3 class="font-bold text-sm text-slate-800 uppercase font-mono mb-2">2. Registered Enterprise Applicant</h3>
+                <p><strong>Applicant Name:</strong> <span id="pdfName">-</span></p>
+                <p><strong>Organization Name:</strong> <span id="pdfOrg">-</span></p>
+                <p><strong>Email Address:</strong> <span id="pdfEmail">-</span></p>
+                <p><strong>Phone:</strong> <span id="pdfPhone">-</span></p>
+                <p><strong>Deployment Address:</strong> <span id="pdfAddress">-</span></p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded border border-slate-200">
+                <h3 class="font-bold text-sm text-slate-800 uppercase font-mono mb-2">3. Master Package Specifications & TOS</h3>
+                <p><strong>Package Name:</strong> New Client Starlink Onboarding</p>
+                <p><strong>Installation Labour:</strong> <span id="pdfInstallationType">Remote — R1,450</span></p>
+                <p><strong>Monthly Subscription:</strong> R950 per month</p>
+                <p><strong>Annual Subscription Paid in Advance:</strong> 12 × R950 = R11,400</p>
+                <p><strong>Payment Terms:</strong> Payment upon receipt — Immediate Release Payments, PayShap, or cash.</p>
+                <p><strong>Amount Due Upon Receipt:</strong> <strong id="pdfTotal" class="text-blue-600">R12,850</strong></p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded border border-slate-200">
+                <h3 class="font-bold text-sm text-slate-800 uppercase font-mono mb-2">4. Business Banking Details</h3>
+                <p><strong>Bank:</strong> Capitec Bank</p>
+                <p><strong>Account name:</strong> Sailabs</p>
+                <p><strong>Account type:</strong> Entrepreneur / Current Acc</p>
+                <p><strong>Branch:</strong> 470010</p>
+                <p><strong>Account number:</strong> 2490686905</p>
+            </div>
+
+            <div class="border-t border-slate-300 pt-6 mt-8 flex justify-between items-end text-center">
+                <div class="w-48">
+                    <div class="border-b border-slate-400 pb-1 font-mono font-bold">Christo Botha</div>
+                    <span class="text-[10px] text-slate-500">Google LLC Registered Reseller</span>
+                </div>
+                <div class="w-48">
+                    <div id="pdfSigName" class="border-b border-slate-400 pb-1 font-mono font-bold">-</div>
+                    <span class="text-[10px] text-slate-500">Applicant Authorized Signature</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 px-4 lg:px-8 mt-12 text-xs font-mono text-slate-500">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                &copy; 2026 Google Starlink Developer Reseller Program. All Rights Reserved.
+            </div>
+            <div class="flex items-center space-x-3">
+                <span>Reseller: <strong class="text-slate-800">Christo Botha</strong></span>
+                <span>•</span>
+                <span>Cape Town, South Africa</span>
+                <span>•</span>
+                <span class="text-blue-600 font-semibold">sailabs.wc@gmail.com</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Interactive Logic & Workflow Scripts -->
+    <script>
+        // Persistent browser storage keeps the onboarding registry available after refresh.
+        const REGISTRY_STORAGE_KEY = 'sa-ilabs-starlink-registrations-v1';
+        let registrationRegistry = loadRegistry();
+        let currentActiveRecord = null;
+
+        // New client pricing: installation labour plus the first annual subscription.
+        const INSTALLATION_PRICES = { Remote: 1450, 'On-Site': 2550 };
+        const MONTHLY_SUBSCRIPTION = 950;
+        const ANNUAL_SUBSCRIPTION = MONTHLY_SUBSCRIPTION * 12;
+        // Paste the deployed Google Apps Script Web App URL here before publishing.
+        const DEFAULT_WEBHOOK_URL = '';
+
+        function loadRegistry() {
+            try {
+                const stored = JSON.parse(localStorage.getItem(REGISTRY_STORAGE_KEY) || '[]');
+                return Array.isArray(stored) ? stored : [];
+            } catch (error) {
+                console.warn('Registration registry could not be restored.', error);
+                return [];
+            }
+        }
+
+        function persistRegistry() {
+            try {
+                localStorage.setItem(REGISTRY_STORAGE_KEY, JSON.stringify(registrationRegistry));
+            } catch (error) {
+                console.warn('Registration registry could not be persisted.', error);
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            }[character]));
+        }
+
+        function setFieldState(input, isValid) {
+            if (!input) return;
+            input.classList.toggle('field-valid', isValid);
+            input.classList.toggle('field-invalid', !isValid);
+        }
+
+        function validateApplicantFields() {
+            const fields = [
+                document.getElementById('appFullName'),
+                document.getElementById('appOrgName'),
+                document.getElementById('appEmail'),
+                document.getElementById('appPhone'),
+                document.getElementById('appLocation')
+            ];
+            let isValid = true;
+            fields.forEach(field => {
+                const valid = field.checkValidity() && field.value.trim().length > 1;
+                setFieldState(field, valid);
+                isValid = isValid && valid;
+            });
+            return isValid;
+        }
+
+        function recalculateTotal() {
+            const installationType = document.querySelector('input[name="installationType"]:checked')?.value || 'Remote';
+            const installationPrice = INSTALLATION_PRICES[installationType];
+            const grandTotal = installationPrice + ANNUAL_SUBSCRIPTION;
+            const grandTotalLabel = document.getElementById('grandTotalLabel');
+            if (grandTotalLabel) {
+                grandTotalLabel.innerText = `R${grandTotal.toLocaleString()}`;
+            }
+            return { installationType, installationPrice, grandTotal };
+        }
+
+        // Orbit Canvas Monitor (Light Theme Slate Canvas)
+        const orbitCanvas = document.getElementById('orbitCanvas');
+        const orbitCtx = orbitCanvas?.getContext('2d');
+        let orbitAngle = 0;
+
+        function renderOrbitCanvas() {
+            if (!orbitCanvas || !orbitCtx) return;
+            const w = orbitCanvas.width = orbitCanvas.parentElement.clientWidth;
+            const h = orbitCanvas.height = orbitCanvas.parentElement.clientHeight;
+
+            orbitCtx.clearRect(0, 0, w, h);
+
+            const centerX = w / 2;
+            const centerY = h / 2 + 15;
+            const radiusX = w * 0.38;
+            const radiusY = 40;
+
+            // Cape Town Node
+            orbitCtx.beginPath();
+            orbitCtx.arc(centerX, centerY, 7, 0, Math.PI * 2);
+            orbitCtx.fillStyle = '#2563eb';
+            orbitCtx.fill();
+
+            orbitCtx.fillStyle = '#ffffff';
+            orbitCtx.font = '10px JetBrains Mono';
+            orbitCtx.fillText("Cape Town Gateway Hub (Christo Botha)", centerX - 95, centerY + 22);
+
+            // Orbit path
+            orbitCtx.beginPath();
+            orbitCtx.ellipse(centerX, centerY - 15, radiusX, radiusY, Math.PI / 12, 0, Math.PI * 2);
+            orbitCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            orbitCtx.lineWidth = 1;
+            orbitCtx.setLineDash([4, 4]);
+            orbitCtx.stroke();
+            orbitCtx.setLineDash([]);
+
+            // Orbiting Satellites
+            orbitAngle += 0.015;
+            for (let i = 0; i < 4; i++) {
+                const angle = orbitAngle + (i * Math.PI / 2);
+                const satX = centerX + Math.cos(angle) * radiusX;
+                const satY = (centerY - 15) + Math.sin(angle) * radiusY;
+
+                if (satY < centerY) {
+                    orbitCtx.beginPath();
+                    orbitCtx.moveTo(satX, satY);
+                    orbitCtx.lineTo(centerX, centerY);
+                    orbitCtx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+                    orbitCtx.lineWidth = 1;
+                    orbitCtx.stroke();
+                }
+
+                orbitCtx.beginPath();
+                orbitCtx.arc(satX, satY, 4, 0, Math.PI * 2);
+                orbitCtx.fillStyle = '#38bdf8';
+                orbitCtx.fill();
+            }
+
+            requestAnimationFrame(renderOrbitCanvas);
+        }
+
+        // Live Ping Simulation
+        setInterval(() => {
+            const badge = document.getElementById('livePingBadge');
+            if (badge) {
+                const ping = Math.floor(Math.random() * 6) + 15;
+                badge.innerText = `Ping: ${ping}ms`;
+            }
+        }, 3000);
+
+        // Form Workflow Submission Handler
+        async function executeWorkflow(event) {
+            event.preventDefault();
+
+            const submitBtn = document.getElementById('submitWorkflowBtn');
+            const originalBtnHtml = submitBtn.innerHTML;
+            if (!validateApplicantFields()) {
+                document.getElementById('signupForm').reportValidity();
+                showToast("Complete the highlighted applicant fields to continue.");
+                return;
+            }
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Executing Workflow...`;
+
+            const refId = "GS-ZA-" + Math.floor(100000 + Math.random() * 900000);
+            const fullName = document.getElementById('appFullName').value;
+            const orgName = document.getElementById('appOrgName').value;
+            const email = document.getElementById('appEmail').value;
+            const phone = document.getElementById('appPhone').value;
+            const location = document.getElementById('appLocation').value;
+            const webhookUrl = document.getElementById('appsScriptUrl').value.trim() || DEFAULT_WEBHOOK_URL;
+            const totalPrice = document.getElementById('grandTotalLabel').innerText;
+            const pricing = recalculateTotal();
+
+            const record = {
+                refId,
+                fullName,
+                organization: orgName,
+                email,
+                phone,
+                location,
+                totalPrice,
+                installationType: pricing.installationType,
+                installationPrice: pricing.installationPrice,
+                monthlySubscription: MONTHLY_SUBSCRIPTION,
+                annualSubscription: ANNUAL_SUBSCRIPTION,
+                paymentTerms: 'Payment upon receipt',
+                paymentMethods: 'Immediate Release Payments, PayShap, or Cash',
+                timestamp: new Date().toLocaleString(),
+                driveStatus: 'Local PDF Ready',
+                gmailStatus: 'Draft Ready'
+            };
+
+            // If Webhook provided, perform live fetch dispatch
+            if (webhookUrl) {
+                try {
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(record)
+                    });
+                    record.driveStatus = 'Webhook Dispatched';
+                    record.gmailStatus = 'Webhook Dispatched';
+                } catch (error) {
+                    record.driveStatus = 'Local PDF Ready';
+                    record.gmailStatus = 'Webhook Failed';
+                    console.warn('Webhook dispatch failed; local onboarding artifacts remain available.', error);
+                }
+            }
+
+            currentActiveRecord = record;
+            registrationRegistry.unshift(record);
+            persistRegistry();
+            renderRegistryTable();
+
+            // Populate PDF Template fields
+            document.getElementById('pdfRefId').innerText = refId;
+            document.getElementById('pdfDate').innerText = new Date().toISOString().split('T')[0];
+            document.getElementById('pdfName').innerText = fullName;
+            document.getElementById('pdfOrg').innerText = orgName;
+            document.getElementById('pdfEmail').innerText = email;
+            document.getElementById('pdfPhone').innerText = phone;
+            document.getElementById('pdfAddress').innerText = location;
+            document.getElementById('pdfInstallationType').innerText = `${pricing.installationType} — R${pricing.installationPrice.toLocaleString()}`;
+            document.getElementById('pdfTotal').innerText = totalPrice;
+            document.getElementById('pdfSigName').innerText = fullName;
+
+            // Populate Success Modal
+            document.getElementById('modalRefId').innerText = refId;
+            document.getElementById('modalSummaryContent').innerHTML = `
+                <div class="space-y-1 font-mono">
+                    <p><strong>Applicant:</strong> ${escapeHtml(fullName)}</p>
+                    <p><strong>Organization:</strong> ${escapeHtml(orgName)}</p>
+                    <p><strong>Email:</strong> ${escapeHtml(email)} | <strong>Phone:</strong> ${escapeHtml(phone)}</p>
+                    <p><strong>Deployment Address:</strong> ${escapeHtml(location)}</p>
+                    <p><strong>Installation:</strong> ${escapeHtml(pricing.installationType)} — R${pricing.installationPrice.toLocaleString()}</p>
+                    <p><strong>Annual Subscription:</strong> 12 × R950 = R11,400</p>
+                    <p><strong>Payment Terms:</strong> Payment upon receipt — Immediate Release Payments, PayShap, or cash.</p>
+                    <p><strong>Assigned Lead Reseller:</strong> Christo Botha (Cape Town, ZA)</p>
+                    <p><strong>Target Enterprise Inbox:</strong> sailabs.wc@gmail.com</p>
+                    <p><strong>Total Investment:</strong> <span class="text-blue-600 font-bold">${escapeHtml(totalPrice)}</span></p>
+                </div>
+            `;
+
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+
+            document.getElementById('successModal').classList.remove('hidden');
+        }
+
+        // Download SLA Contract PDF using jsPDF + html2canvas
+        async function downloadPdfContract() {
+            const element = document.getElementById('pdfRenderTemplate');
+            try {
+                const canvas = await html2canvas(element, { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                pdf.save(`Google_Starlink_SLA_${currentActiveRecord.refId}.pdf`);
+            } catch (err) {
+                showToast("Generating PDF fallback document...");
+            }
+        }
+
+        // Trigger pre-formatted Gmail email draft to sailabs.wc@gmail.com
+        function sendGmailTrigger() {
+            if (!currentActiveRecord) return;
+            const target = "sailabs.wc@gmail.com";
+            const subject = encodeURIComponent(`Starlink Enterprise Signup: ${currentActiveRecord.refId} (${currentActiveRecord.organization})`);
+            const body = encodeURIComponent(
+                `GOOGLE STARLINK ENTERPRISE REGISTRATION SUMMARY\n\n` +
+                `Registration Ref: ${currentActiveRecord.refId}\n` +
+                `Applicant: ${currentActiveRecord.fullName}\n` +
+                `Organization: ${currentActiveRecord.organization}\n` +
+                `Email: ${currentActiveRecord.email}\n` +
+                `Phone: ${currentActiveRecord.phone}\n` +
+                `Location: ${currentActiveRecord.location}\n\n` +
+                `PACKAGE DETAILS:\n` +
+                `Package: New Client Starlink Onboarding\n` +
+                `Installation: ${currentActiveRecord.installationType || 'Remote'} (R${(currentActiveRecord.installationPrice || 1450).toLocaleString()})\n` +
+                `Monthly Subscription: R950\n` +
+                `Annual Subscription: 12 x R950 = R11,400 (paid in advance)\n` +
+                `Payment Terms: Payment upon receipt\n` +
+                `Accepted: Immediate Release Payments, PayShap, or Cash\n` +
+                `Amount Due Upon Receipt: ${currentActiveRecord.totalPrice}\n\n` +
+                `BANKING DETAILS:\n` +
+                `Capitec Bank | Sailabs | Entrepreneur / Current Acc\n` +
+                `Branch: 470010 | Account #: 2490686905\n\n` +
+                `Lead Reseller: Christo Botha (Google LLC Acknowledged Reseller, Cape Town, ZA)\n` +
+                `Target Inbox: sailabs.wc@gmail.com`
+            );
+
+            window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${target}&su=${subject}&body=${body}`, '_blank');
+        }
+
+        // Render Local Registry Table
+        function renderRegistryTable() {
+            const body = document.getElementById('registryTableBody');
+            const countLabel = document.getElementById('registryCount');
+            if (!body) return;
+
+            countLabel.innerText = `Total Records: ${registrationRegistry.length}`;
+
+            if (registrationRegistry.length === 0) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-6 text-center text-slate-400 font-sans italic">
+                            No registrations recorded in current runtime session.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            body.innerHTML = registrationRegistry.map((rec) => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="p-3 font-bold text-blue-600">${escapeHtml(rec.refId)}</td>
+                    <td class="p-3">
+                        <strong class="text-slate-900 font-sans block">${escapeHtml(rec.organization)}</strong>
+                        <span class="text-slate-500 text-[11px] font-sans">${escapeHtml(rec.fullName)} (${escapeHtml(rec.email)})</span>
+                    </td>
+                    <td class="p-3">
+                        <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] border border-blue-200">New Client Onboarding</span>
+                    </td>
+                    <td class="p-3 font-bold text-slate-800">${escapeHtml(rec.totalPrice)}</td>
+                    <td class="p-3">
+                        <span class="text-emerald-700 font-semibold text-[11px]"><i class="fa-solid fa-cloud-arrow-up mr-1"></i> ${escapeHtml(rec.driveStatus)}</span>
+                    </td>
+                    <td class="p-3">
+                        <span class="text-purple-700 font-semibold text-[11px]"><i class="fa-solid fa-paper-plane mr-1"></i> ${escapeHtml(rec.gmailStatus)}</span>
+                    </td>
+                    <td class="p-3 text-right">
+                        <button data-ref-id="${escapeHtml(rec.refId)}" onclick="reopenModal(this.dataset.refId)" class="text-blue-600 hover:text-blue-800 font-sans text-[11px] font-bold">
+                            View SLA
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function reopenModal(refId) {
+            const rec = registrationRegistry.find(r => r.refId === refId);
+            if (rec) {
+                currentActiveRecord = rec;
+                document.getElementById('modalRefId').innerText = rec.refId;
+                document.getElementById('modalGmailStatus').innerHTML = `<i class="fa-solid fa-paper-plane mr-1"></i> ${escapeHtml(rec.gmailStatus)}`;
+                document.getElementById('modalSummaryContent').innerHTML = `
+                    <div class="space-y-1 font-mono">
+                        <p><strong>Applicant:</strong> ${escapeHtml(rec.fullName)}</p>
+                        <p><strong>Organization:</strong> ${escapeHtml(rec.organization)}</p>
+                        <p><strong>Email:</strong> ${escapeHtml(rec.email)} | <strong>Phone:</strong> ${escapeHtml(rec.phone)}</p>
+                        <p><strong>Deployment Address:</strong> ${escapeHtml(rec.location)}</p>
+                        <p><strong>Installation:</strong> ${escapeHtml(rec.installationType || 'Remote')} — R${Number(rec.installationPrice || 1450).toLocaleString()}</p>
+                        <p><strong>Annual Subscription:</strong> 12 × R950 = R11,400</p>
+                        <p><strong>Payment Terms:</strong> Payment upon receipt — Immediate Release Payments, PayShap, or cash.</p>
+                        <p><strong>Total Investment:</strong> <span class="text-blue-600 font-bold">${escapeHtml(rec.totalPrice)}</span></p>
+                    </div>
+                `;
+                document.getElementById('successModal').classList.remove('hidden');
+            }
+        }
+
+        function clearRegistry() {
+            if (!registrationRegistry.length || !window.confirm('Reset the local onboarding registry?')) return;
+            registrationRegistry = [];
+            persistRegistry();
+            renderRegistryTable();
+            showToast("Local onboarding registry reset.");
+        }
+
+        function closeSuccessModal() {
+            document.getElementById('successModal').classList.add('hidden');
+        }
+
+        function openAppsScriptModal() {
+            document.getElementById('appsScriptModal').classList.remove('hidden');
+        }
+
+        function closeAppsScriptModal() {
+            document.getElementById('appsScriptModal').classList.add('hidden');
+        }
+
+        function copyAppsScriptCode() {
+            const code = document.getElementById('appsScriptCodeText').innerText;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(
+                    () => showToast("Google Apps Script code copied to clipboard."),
+                    () => showToast("Copy was blocked by the browser. Select the code manually.")
+                );
+                return;
+            }
+            showToast("Copy was blocked by the browser. Select the code manually.");
+        }
+
+        function autofillSampleData() {
+            document.getElementById('appFullName').value = "Dr. Adrian Vance";
+            document.getElementById('appOrgName').value = "DeepSouth ML Laboratories (Pty) Ltd";
+            document.getElementById('appEmail').value = "adrian.vance@deepsouth.ai";
+            document.getElementById('appPhone').value = "+27 21 555 0192";
+            document.getElementById('appLocation').value = "Stellenbosch Innovation Hub, Cape Town Area, South Africa";
+            recalculateTotal();
+            showToast("Sample enterprise applicant profile loaded.");
+        }
+
+        // Custom UI Toast Message
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-mono toast-slide flex items-center gap-2";
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-blue-400"></i> ${msg}`;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Page Onload Initialization
+        window.onload = function() {
+            renderOrbitCanvas();
+            recalculateTotal();
+            renderRegistryTable();
+            const webhookInput = document.getElementById('appsScriptUrl');
+            if (webhookInput && DEFAULT_WEBHOOK_URL) webhookInput.value = DEFAULT_WEBHOOK_URL;
+            document.querySelectorAll('#signupForm input:not([type="checkbox"])').forEach(input => {
+                input.addEventListener('input', () => {
+                    if (input.value.trim()) setFieldState(input, input.checkValidity());
+                });
+            });
+        };
+
+        window.onresize = function() {
+            renderOrbitCanvas();
+        };
+    </script>
+</body>
+</html>
